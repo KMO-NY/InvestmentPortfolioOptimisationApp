@@ -523,13 +523,13 @@ def calculate_tracking_error(portfolio_daily_rets, benchmark_daily_rets, trading
     Tracking error = annualised std of active return (portfolio - benchmark).
     Aligns series on common dates.
     """
-    active = portfolio_daily_rets.subtract(benchmark_daily_rets, fill_value=np.nan).dropna()
-    return active.std() * np.sqrt(trading_days)
+    active = (portfolio_daily_rets - benchmark_daily_rets).dropna()
+    return float(active.std()) * np.sqrt(trading_days)
 
 
 def calculate_information_ratio(portfolio_daily_rets, benchmark_daily_rets, trading_days=252):
     """Information Ratio = Active Return / Tracking Error."""
-    active = portfolio_daily_rets.subtract(benchmark_daily_rets, fill_value=np.nan).dropna()
+    active = (portfolio_daily_rets - benchmark_daily_rets).dropna()
     active_return = active.mean() * trading_days
     te = active.std() * np.sqrt(trading_days)
     return active_return / te if te > 0 else 0.0
@@ -538,31 +538,35 @@ def calculate_information_ratio(portfolio_daily_rets, benchmark_daily_rets, trad
 def benchmark_comparison_table(portfolio_daily_rets, benchmark_daily_rets,
                                 risk_free_rate=0.0, trading_days=252):
     """Return a side-by-side comparison dict for portfolio vs benchmark."""
-    def ann_return(r): return r.mean() * trading_days
-    def ann_vol(r): return r.std() * np.sqrt(trading_days)
-    def sharpe(r): return (ann_return(r) - risk_free_rate) / ann_vol(r) if ann_vol(r) > 0 else 0
+    try:
+        def ann_return(r): return float(r.mean()) * trading_days
+        def ann_vol(r): return float(r.std()) * np.sqrt(trading_days)
+        def sharpe(r): return (ann_return(r) - risk_free_rate) / ann_vol(r) if ann_vol(r) > 0 else 0
 
-    active = portfolio_daily_rets.subtract(benchmark_daily_rets, fill_value=np.nan).dropna()
-    active_return = ann_return(active)
-    te = calculate_tracking_error(portfolio_daily_rets, benchmark_daily_rets, trading_days)
-    ir = active_return / te if te > 0 else 0
+        active = (portfolio_daily_rets - benchmark_daily_rets).dropna()
+        active_return = ann_return(active)
+        te = calculate_tracking_error(portfolio_daily_rets, benchmark_daily_rets, trading_days)
+        ir = active_return / te if te > 0 else 0
 
-    return {
-        "Metric": ["Annualised Return", "Annualised Volatility", "Sharpe Ratio",
-                   "Active Return", "Tracking Error", "Information Ratio"],
-        "Portfolio": [
-            f"{ann_return(portfolio_daily_rets):.2%}",
-            f"{ann_vol(portfolio_daily_rets):.2%}",
-            f"{sharpe(portfolio_daily_rets):.2f}",
-            f"{active_return:.2%}", f"{te:.2%}", f"{ir:.2f}",
-        ],
-        "Benchmark": [
-            f"{ann_return(benchmark_daily_rets):.2%}",
-            f"{ann_vol(benchmark_daily_rets):.2%}",
-            f"{sharpe(benchmark_daily_rets):.2f}",
-            "—", "—", "—",
-        ],
-    }
+        return {
+            "Metric": ["Annualised Return", "Annualised Volatility", "Sharpe Ratio",
+                       "Active Return", "Tracking Error", "Information Ratio"],
+            "Portfolio": [
+                f"{ann_return(portfolio_daily_rets):.2%}",
+                f"{ann_vol(portfolio_daily_rets):.2%}",
+                f"{sharpe(portfolio_daily_rets):.2f}",
+                f"{active_return:.2%}", f"{te:.2%}", f"{ir:.2f}",
+            ],
+            "Benchmark": [
+                f"{ann_return(benchmark_daily_rets):.2%}",
+                f"{ann_vol(benchmark_daily_rets):.2%}",
+                f"{sharpe(benchmark_daily_rets):.2f}",
+                "—", "—", "—",
+            ],
+        }
+    except Exception as e:
+        st.error(f"benchmark_comparison_table failed: {e}")
+        return None
 
 
 def plot_cumulative_returns(portfolio_daily_rets, benchmark_daily_rets, benchmark_name="Benchmark"):

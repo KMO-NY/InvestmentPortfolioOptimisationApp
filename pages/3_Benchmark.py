@@ -37,8 +37,13 @@ except ValueError as e:
     st.error(str(e))
     st.stop()
 
+if isinstance(benchmark_daily_rets, pd.DataFrame):
+    benchmark_daily_rets = benchmark_daily_rets.squeeze()
 weights = normalize_weights(amounts)
 port_daily_rets = portfolio_daily_returns(weights, daily_returns_df)
+
+if isinstance(port_daily_rets, pd.DataFrame):
+    port_daily_rets = port_daily_rets.squeeze()
 
 # Align on common dates
 common_dates = port_daily_rets.index.intersection(benchmark_daily_rets.index)
