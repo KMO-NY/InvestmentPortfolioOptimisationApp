@@ -1,100 +1,79 @@
 import streamlit as st
-
-# Data handling and statistical analysis
 import pandas as pd
-from pandas_datareader import data
-import numpy as np
-from scipy import stats
-
-# Data visualization
 import plotly.express as px
-
-# Financial data
-import quantstats as qs
-import ta
 import yfinance as yf
 
-# Functions I created
-from utils import validate_exchange_symbols
-from utils import initialize_session_state
-from utils import clear_button_clicked
+from utils import (
+    validate_exchange_symbols, initialize_session_state,
+    clear_button_clicked, exchanges, zar,
+    BOND_ETF_OPTIONS,
+)
 
-# Variables
-from utils import exchanges
-from utils import zar
+st.set_page_config(page_title="Portfolio Intelligence", page_icon="📊", layout="wide")
 
-st.title("Investment Portfolio Optimization")
-st.write("### A Data Science Project by Kgosigadi Nyepele")
-st.write("Use this page to enter data on your stock portfolio.")
+st.title("Investment Portfolio Intelligence Tool")
+st.caption("Built on Modern Portfolio Theory | Brinson Attribution | Institutional Risk Metrics")
 
 st.sidebar.header("Navigation")
-st.sidebar.write("Use the sidebar to navigate between pages. After loading your data, head on over to the Analysis page.")
+st.sidebar.write("Enter your portfolio here, then use the pages to analyse it.")
 
-# initialize session_state:
 initialize_session_state()
 
-# "Clear" button to reset form and session state
-clear_col1, clear_col2 = st.columns([3,1])
-if clear_col2.button("**:red[Clear Stock Data]**"):
+# ── Clear button ───────────────────────────────────────────────────────────────
+_, clear_col = st.columns([4, 1])
+if clear_col.button("**:red[Clear Data]**"):
     clear_button_clicked()
 
-#  Generate the dictionary dynamically
+# ── Exchange validation (cached) ───────────────────────────────────────────────
 country_suffix_map = validate_exchange_symbols(exchanges)
-
-# Dropdown for country selection
-selected_country = st.selectbox("Select Your Country:", options="South Africa")
-
-# Retrieve the suffix based on the selected country
+selected_country = st.selectbox("Select Your Country:", options=["South Africa"])
 selected_suffix = ".JO"
 
-# dates
+# ── Date range ─────────────────────────────────────────────────────────────────
 date_col1, date_col2 = st.columns(2)
+start_date = date_col1.date_input("From:", format="DD/MM/YYYY",
+                                   value=st.session_state.get("start_date", None))
+end_date = date_col2.date_input("To:", format="DD/MM/YYYY",
+                                 value=st.session_state.get("end_date", None))
 
-start_date = date_col1.date_input("From:", format= "DD/MM/YYYY", value=st.session_state.get("start_date", None))
-end_date = date_col2.date_input("To:", format= "DD/MM/YYYY", value=st.session_state.get("end_date", None))
-
-if start_date is not None:
+if start_date:
     st.session_state["start_date"] = start_date
-if end_date is not None:
+if end_date:
     st.session_state["end_date"] = end_date
-           
-# Section for user stock input
+
+# ── Fixed income option ────────────────────────────────────────────────────────
+st.write("### Fixed Income Allocation (Optional)")
+st.caption("Adding a bond ETF extends the efficient frontier analysis to a multi-asset view.")
+selected_bond = st.selectbox("Add a Bond ETF to your analysis:", options=list(BOND_ETF_OPTIONS.keys()))
+st.session_state["bond_etf"] = BOND_ETF_OPTIONS[selected_bond]
+
+# ── Stock input ────────────────────────────────────────────────────────────────
 st.write("### Add Stocks and Amount Invested")
 
-# Input fields for ticker and amount invested
 with st.form("add_stock_form", clear_on_submit=True):
     col1, col2 = st.columns(2)
-    ticker = col1.text_input("Enter the stock ticker symbol:")
-    amount = col2.number_input("Amount Invested:", min_value=0.0, step=1.0, format="%.2f")
-    add_stock = st.form_submit_button("Add Stock")
-    
-    if add_stock:
+    ticker = col1.text_input("Ticker symbol (without exchange suffix):")
+    amount = col2.number_input("Amount Invested (R):", min_value=0.0, step=1.0, format="%.2f")
+    if st.form_submit_button("Add Stock"):
         if ticker and amount > 0:
-            # Add stock entry to the list
-            st.session_state["stock_list"].append({"Ticker": ticker.upper(), "Amount Invested": amount})
-            st.success(f"Added {ticker.upper()}{selected_suffix} with amount {zar}{amount:,.2f}".replace(",", " "))        # format amount for readbility
+            st.session_state["stock_list"].append({
+                "Ticker": ticker.upper(), "Amount Invested": amount
+            })
+            st.success(f"Added {ticker.upper()}{selected_suffix} — {zar}{amount:,.2f}")
         else:
-            st.error("Please enter a valid ticker symbol and investment amount.")
-            
-# Display the current portfolio
-if st.session_state["stock_list"]:
-    st.write("Your Current Portfolio:")
-    # Update portfolio DataFrame in session state
-    st.session_state["portfolio_df"] = pd.DataFrame(st.session_state["stock_list"])
-    st.dataframe(st.session_state["portfolio_df"])
-    portfolio_df = pd.DataFrame(st.session_state["portfolio_df"])      
+            st.error("Enter a valid ticker and a positive amount.")
 
-# Button to finalize and show pie chart
-if st.button("Load Stock Data"):
-    if st.session_state["stock_list"]:
-        # Generate pie chart
+# ── Portfolio table ────────────────────────────────────────────────────────────
+if st.session_state["stock_list"]:
+    st.write("### Your Current Portfolio")
+    st.session_state["portfolio_df"] = pd.DataFrame(st.session_state["stock_list"])
+    st.dataframe(st.session_state["portfolio_df"], use_container_width=True)
+
+    if st.button("Load Stock Data"):
+        portfolio_df = st.session_state["portfolio_df"]
         fig = px.pie(
-            portfolio_df,
-            values="Amount Invested",
-            names="Ticker",
-            title="Portfolio Division",
-            hole=0.4,  
+            portfolio_df, values="Amount Invested", names="Ticker",
+            title="Portfolio Allocation by Amount Invested", hole=0.4,
         )
-        st.plotly_chart(fig)
-    else:
-        st.error("You need to add at least one stock to view the portfolio division.")
+        st.plotly_chart(fig, use_container_width=True)
+        st.info("Head to the Analysis pages in the sidebar to run optimisation and risk analysis.")

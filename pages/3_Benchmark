@@ -1,0 +1,97 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+
+from utils import (
+    load_session_state, get_stock_data, get_benchmark_data,
+    normalize_weights, portfolio_daily_returns,
+    benchmark_comparison_table, plot_cumulative_returns,
+    calculate_tracking_error, calculate_information_ratio,
+    BENCHMARK_OPTIONS,
+)
+
+st.set_page_config(page_title="Benchmark Comparison", page_icon="📏", layout="wide")
+st.title("Benchmark Comparison")
+st.caption("Active return, tracking error, and information ratio vs a user-selected benchmark.")
+
+# ── Load state ─────────────────────────────────────────────────────────────────
+tickers, amounts, start_date, end_date = load_session_state()
+
+if not tickers or start_date is None or end_date is None:
+    st.warning("Enter your portfolio on the home page first.")
+    st.stop()
+
+risk_free_rate = st.sidebar.number_input(
+    "Risk-Free Rate:", value=0.083, step=0.001, format="%.3f"
+)
+
+# ── Benchmark selection ────────────────────────────────────────────────────────
+benchmark_name = st.selectbox("Select a benchmark:", list(BENCHMARK_OPTIONS.keys()))
+benchmark_ticker = BENCHMARK_OPTIONS[benchmark_name]
+
+# ── Fetch data ─────────────────────────────────────────────────────────────────
+try:
+    stock_data, daily_returns_df = get_stock_data(tickers, start_date, end_date)
+    _, benchmark_daily_rets = get_benchmark_data(benchmark_ticker, start_date, end_date)
+except ValueError as e:
+    st.error(str(e))
+    st.stop()
+
+weights = normalize_weights(amounts)
+port_daily_rets = portfolio_daily_returns(weights, daily_returns_df)
+
+# Align on common dates
+common_dates = port_daily_rets.index.intersection(benchmark_daily_rets.index)
+port_aligned = port_daily_rets.loc[common_dates]
+bench_aligned = benchmark_daily_rets.loc[common_dates]
+
+# ── Cumulative return chart ────────────────────────────────────────────────────
+st.write("## Cumulative Return")
+fig = plot_cumulative_returns(port_aligned, bench_aligned, benchmark_name)
+st.plotly_chart(fig, use_container_width=True)
+
+# ── Comparison metrics table ───────────────────────────────────────────────────
+st.write("## Performance Metrics vs Benchmark")
+comparison = benchmark_comparison_table(port_aligned, bench_aligned, risk_free_rate)
+comparison_df = pd.DataFrame(comparison).set_index("Metric")
+st.dataframe(comparison_df, use_container_width=True)
+
+# Highlighted stats
+te = calculate_tracking_error(port_aligned, bench_aligned)
+ir = calculate_information_ratio(port_aligned, bench_aligned)
+active_ret = (port_aligned - bench_aligned).mean() * 252
+
+c1, c2, c3 = st.columns(3)
+c1.metric("Active Return (ann.)", f"{active_ret:.2%}")
+c2.metric("Tracking Error (ann.)", f"{te:.2%}")
+c3.metric("Information Ratio", f"{ir:.2f}")
+
+with st.expander("What these measure"):
+    st.markdown("""
+| Metric | Definition |
+|---|---|
+| **Active Return** | Portfolio return minus benchmark return. Positive means outperformance. |
+| **Tracking Error** | Annualised standard deviation of the active return series. High TE = large active bets. |
+| **Information Ratio** | Active return divided by tracking error. Shows skill per unit of active risk taken. A ratio above 0.5 is considered good; above 1.0 is exceptional. |
+    """)
+
+# ── Rolling active return ──────────────────────────────────────────────────────
+st.write("## Rolling 30-Day Active Return")
+import plotly.graph_objects as go
+active = port_aligned - bench_aligned
+rolling_active = active.rolling(30).mean() * 252
+
+fig2 = go.Figure()
+fig2.add_trace(go.Scatter(
+    x=rolling_active.index, y=rolling_active.values,
+    mode="lines", name="Rolling Active Return",
+    line=dict(color="steelblue", width=2),
+    fill="tozeroy",
+    fillcolor="rgba(70, 130, 180, 0.15)",
+))
+fig2.add_hline(y=0, line_dash="dash", line_color="gray")
+fig2.update_layout(
+    yaxis_tickformat=".1%", height=350,
+    xaxis_title="Date", yaxis_title="Active Return (annualised)",
+)
+st.plotly_chart(fig2, use_container_width=True)
