@@ -1,4 +1,4 @@
-# Investment Portfolio Intelligence Tool
+# Investment Portfolio Optimisation App
 
 A Streamlit application for multi-asset portfolio analysis, built on institutional investment methodology. Designed to support the kind of quantitative portfolio review work central to investment consulting practice.
 
@@ -116,7 +116,7 @@ The simulation initialises a portfolio at target weights and applies daily price
 ## Project Structure
 
 ```
-your_project/
+InvestmentPorfolioOptimisationApp/
 ├── streamlitapp.py
 ├── utils.py
 ├── README.md

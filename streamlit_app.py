@@ -11,7 +11,7 @@ from utils import (
 
 st.set_page_config(page_title="Portfolio Intelligence", page_icon="📊", layout="wide")
 
-st.title("Investment Portfolio Intelligence Tool")
+st.title("Investment Portfolio Optimisation App / Intelligence Tool")
 st.caption("Built on Modern Portfolio Theory | Brinson Attribution | Institutional Risk Metrics")
 
 st.sidebar.header("Navigation")
